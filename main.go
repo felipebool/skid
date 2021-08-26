@@ -5,10 +5,10 @@ import (
 	"fmt"
 	"log"
 	"net/http"
-	"os"
-	"os/signal"
+	// "os"
+	// "os/signal"
 	"sync"
-	"syscall"
+	// "syscall"
 	"time"
 )
 
@@ -55,6 +55,7 @@ func (w *window) add(epoch int64) {
 
 func counter(sliding *window) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
+		log.Println("request received")
 		epoch := time.Now().Unix()
 		sliding.add(epoch)
 		fmt.Fprintf(w, "%d", sliding.count(epoch))
@@ -62,15 +63,17 @@ func counter(sliding *window) http.HandlerFunc {
 }
 
 func run(windowSize int) error {
-	shutdown := make(chan os.Signal, 1)
-	signal.Notify(shutdown, syscall.SIGINT, syscall.SIGTERM)
+	// shutdown := make(chan os.Signal, 1)
+	// signal.Notify(shutdown, syscall.SIGINT, syscall.SIGTERM)
 
+	http.HandleFunc("/favicon.ico", func(rw http.ResponseWriter, r *http.Request) {})
 	http.HandleFunc("/", counter(new(int64(windowSize))))
 	return http.ListenAndServe(":8080", nil)
 }
 
 func main() {
 	flag.Parse()
+	log.Println("server started...")
 	if err := run(*size); err != nil {
 		log.Fatal(err)
 	}
