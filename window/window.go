@@ -1,6 +1,7 @@
 package window
 
 import (
+	"encoding/json"
 	"os"
 	"sync"
 )
@@ -16,6 +17,7 @@ func (w *Window) Count(epoch int64) int64 {
 	start := epoch - int64(w.size)
 
 	w.mu.Lock()
+	defer w.mu.Unlock()
 	// get total requests inside window
 	for timestamp, total := range w.window {
 		if timestamp > start {
@@ -25,7 +27,6 @@ func (w *Window) Count(epoch int64) int64 {
 		// reduce memory footprint
 		delete(w.window, timestamp)
 	}
-	w.mu.Unlock()
 	return sum
 }
 
@@ -37,6 +38,7 @@ func (w *Window) Add(epoch int64) {
 
 func (w *Window) Persist(path string) error {
 	w.mu.Lock()
+	defer w.mu.Unlock()
 
 	fp, err := os.Create(path)
 	if err != nil {
@@ -44,7 +46,14 @@ func (w *Window) Persist(path string) error {
 	}
 	defer fp.Close()
 
-	w.mu.Unlock()
+	data, err := json.Marshal(w.window)
+	if err != nil {
+		return err
+	}
+
+	if _, err = fp.Write(data); err != nil {
+		return err
+	}
 	return nil
 }
 

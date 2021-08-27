@@ -17,6 +17,8 @@ import (
 var size = flag.Int("size", 60, "window size")
 var path = flag.String("path", ".window.json", "path to persist window")
 
+//var restore = flag.Bool("restore", false, "restore state from file")
+
 func counter(sliding *window.Window) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		log.Println("request received")
