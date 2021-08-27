@@ -14,9 +14,10 @@ import (
 	"github.com/felipebool/skid/window"
 )
 
-var size = flag.Int("size", 60, "window size")
-var path = flag.String("path", ".window.json", "path to persist window")
-var restore = flag.Bool("restore", false, "restore state from file")
+var size = flag.Int("size", 60, "window size (default: 60 seconds)")
+var path = flag.String("path", ".window.json", "path to persist window (default: .window.json)")
+var restore = flag.Bool("restore", false, "restore state from file (default: false)")
+var port = flag.Int("port", 8080, "port to use (default: 8080)")
 
 func counter(sliding *window.Window) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
@@ -27,13 +28,13 @@ func counter(sliding *window.Window) http.HandlerFunc {
 	}
 }
 
-func run(size int, path string, restore bool) error {
+func run(size, port int, path string, restore bool) error {
 	shutdown := make(chan os.Signal, 1)
 	serverError := make(chan error)
 
 	// signal trap to gracefully stop application
 	signal.Notify(shutdown, syscall.SIGINT, syscall.SIGTERM)
-	sliding := window.New(int64(size), path, restore)
+	sliding := window.New(size, path, restore)
 
 	// avoid double request when testing on browser
 	http.HandleFunc("/favicon.ico", func(rw http.ResponseWriter, r *http.Request) {})
@@ -41,7 +42,7 @@ func run(size int, path string, restore bool) error {
 
 	// keep main goroutine clean to receive errors
 	go func() {
-		serverError <- http.ListenAndServe(":8080", nil)
+		serverError <- http.ListenAndServe(fmt.Sprintf(":%d", port), nil)
 	}()
 
 	select {
@@ -62,7 +63,7 @@ func run(size int, path string, restore bool) error {
 func main() {
 	flag.Parse()
 	log.Println("server started")
-	if err := run(*size, *path, *restore); err != nil {
+	if err := run(*size, *port, *path, *restore); err != nil {
 		log.Fatal(err)
 	}
 }

@@ -13,13 +13,13 @@ type Window struct {
 	window map[int64]int64
 }
 
+// Count sums the number of requests in the window
 func (w *Window) Count(epoch int64) int64 {
 	var sum int64
-	start := epoch - int64(w.size)
+	start := epoch - w.size
 
 	w.mu.Lock()
 	defer w.mu.Unlock()
-	// get total requests inside window
 	for timestamp, total := range w.window {
 		if timestamp > start {
 			sum += total
@@ -31,12 +31,14 @@ func (w *Window) Count(epoch int64) int64 {
 	return sum
 }
 
+// Add increments the counter for the specific second inside the window
 func (w *Window) Add(epoch int64) {
 	w.mu.Lock()
 	w.window[epoch]++
 	w.mu.Unlock()
 }
 
+// Persist persists the window to a file
 func (w *Window) Persist() error {
 	w.mu.Lock()
 	defer w.mu.Unlock()
@@ -45,7 +47,6 @@ func (w *Window) Persist() error {
 	if err != nil {
 		return err
 	}
-
 	if err = os.WriteFile(w.path, data, 0644); err != nil {
 		return err
 	}
@@ -66,10 +67,10 @@ func (w *Window) restore() error {
 	return nil
 }
 
-func New(size int64, path string, restore bool) *Window {
+func New(size int, path string, restore bool) *Window {
 	w := &Window{
 		mu:     &sync.Mutex{},
-		size:   size,
+		size:   int64(size),
 		path:   path,
 		window: make(map[int64]int64),
 	}
