@@ -16,8 +16,7 @@ import (
 
 var size = flag.Int("size", 60, "window size")
 var path = flag.String("path", ".window.json", "path to persist window")
-
-//var restore = flag.Bool("restore", false, "restore state from file")
+var restore = flag.Bool("restore", false, "restore state from file")
 
 func counter(sliding *window.Window) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
@@ -28,13 +27,13 @@ func counter(sliding *window.Window) http.HandlerFunc {
 	}
 }
 
-func run(windowSize int) error {
+func run(size int, path string, restore bool) error {
 	shutdown := make(chan os.Signal, 1)
 	serverError := make(chan error)
 
 	// signal trap to gracefully stop application
 	signal.Notify(shutdown, syscall.SIGINT, syscall.SIGTERM)
-	sliding := window.New(int64(windowSize))
+	sliding := window.New(int64(size), path, restore)
 
 	// avoid double request when testing on browser
 	http.HandleFunc("/favicon.ico", func(rw http.ResponseWriter, r *http.Request) {})
@@ -51,11 +50,11 @@ func run(windowSize int) error {
 	case <-shutdown:
 		log.Println("shutdown started")
 		log.Println("trying to persist window to file")
-		if err := sliding.Persist(*path); err != nil {
+		if err := sliding.Persist(); err != nil {
 			log.Println("unable to persist window to file")
 			return err
 		}
-		log.Println("window persisted successfully to", *path)
+		log.Println("window persisted successfully to", path)
 	}
 	return nil
 }
@@ -63,7 +62,7 @@ func run(windowSize int) error {
 func main() {
 	flag.Parse()
 	log.Println("server started")
-	if err := run(*size); err != nil {
+	if err := run(*size, *path, *restore); err != nil {
 		log.Fatal(err)
 	}
 }

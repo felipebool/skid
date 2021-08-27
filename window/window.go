@@ -9,6 +9,7 @@ import (
 type Window struct {
 	mu     *sync.Mutex
 	size   int64
+	path   string
 	window map[int64]int64
 }
 
@@ -36,31 +37,44 @@ func (w *Window) Add(epoch int64) {
 	w.mu.Unlock()
 }
 
-func (w *Window) Persist(path string) error {
+func (w *Window) Persist() error {
 	w.mu.Lock()
 	defer w.mu.Unlock()
-
-	fp, err := os.Create(path)
-	if err != nil {
-		return err
-	}
-	defer fp.Close()
 
 	data, err := json.Marshal(w.window)
 	if err != nil {
 		return err
 	}
 
-	if _, err = fp.Write(data); err != nil {
+	if err = os.WriteFile(w.path, data, 0644); err != nil {
 		return err
 	}
 	return nil
 }
 
-func New(size int64) *Window {
-	return &Window{
+func (w *Window) restore() error {
+	w.mu.Lock()
+	defer w.mu.Unlock()
+
+	data, err := os.ReadFile(w.path)
+	if err != nil {
+		return err
+	}
+	if err := json.Unmarshal(data, &w.window); err != nil {
+		return err
+	}
+	return nil
+}
+
+func New(size int64, path string, restore bool) *Window {
+	w := &Window{
 		mu:     &sync.Mutex{},
 		size:   size,
+		path:   path,
 		window: make(map[int64]int64),
 	}
+	if restore {
+		w.restore()
+	}
+	return w
 }
