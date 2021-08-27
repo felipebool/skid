@@ -72,6 +72,8 @@ func counter(sliding *window) http.HandlerFunc {
 func run(windowSize int) error {
 	shutdown := make(chan os.Signal, 1)
 	serverError := make(chan error)
+
+	// signal trap to gracefully stop application
 	signal.Notify(shutdown, syscall.SIGINT, syscall.SIGTERM)
 	sliding := new(int64(windowSize))
 
@@ -79,6 +81,7 @@ func run(windowSize int) error {
 	http.HandleFunc("/favicon.ico", func(rw http.ResponseWriter, r *http.Request) {})
 	http.HandleFunc("/", counter(sliding))
 
+	// start server in another goroutine
 	go func() {
 		serverError <- http.ListenAndServe(":8080", nil)
 	}()
@@ -89,6 +92,7 @@ func run(windowSize int) error {
 	case <-shutdown:
 		log.Println("shutdown started")
 		log.Println("trying to persist window to file")
+		// try to persist data to file
 		if err := sliding.persist(*path); err != nil {
 			log.Println("unable to persist to file")
 			return err
