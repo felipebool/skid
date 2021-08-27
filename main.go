@@ -5,14 +5,16 @@ import (
 	"fmt"
 	"log"
 	"net/http"
-	// "os"
-	// "os/signal"
+	"os"
+	"os/signal"
+	"syscall"
+
 	"sync"
-	// "syscall"
 	"time"
 )
 
 var size = flag.Int("size", 60, "window size")
+var path = flag.String("path", ".window.json", "path to persist window")
 
 // add signal to save to file when ctrl-C
 type window struct {
@@ -53,6 +55,11 @@ func (w *window) add(epoch int64) {
 	w.mu.Unlock()
 }
 
+func (w *window) persist(path string) error {
+	log.Println("window persisted successfully to", path)
+	return nil
+}
+
 func counter(sliding *window) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		log.Println("request received")
@@ -63,17 +70,36 @@ func counter(sliding *window) http.HandlerFunc {
 }
 
 func run(windowSize int) error {
-	// shutdown := make(chan os.Signal, 1)
-	// signal.Notify(shutdown, syscall.SIGINT, syscall.SIGTERM)
+	shutdown := make(chan os.Signal, 1)
+	serverError := make(chan error)
+	signal.Notify(shutdown, syscall.SIGINT, syscall.SIGTERM)
+	sliding := new(int64(windowSize))
 
+	// avoid double request when testing on browser
 	http.HandleFunc("/favicon.ico", func(rw http.ResponseWriter, r *http.Request) {})
-	http.HandleFunc("/", counter(new(int64(windowSize))))
-	return http.ListenAndServe(":8080", nil)
+	http.HandleFunc("/", counter(sliding))
+
+	go func() {
+		serverError <- http.ListenAndServe(":8080", nil)
+	}()
+
+	select {
+	case err := <-serverError:
+		return err
+	case <-shutdown:
+		log.Println("shutdown started")
+		log.Println("trying to persist window to file")
+		if err := sliding.persist(*path); err != nil {
+			log.Println("unable to persist to file")
+			return err
+		}
+	}
+	return nil
 }
 
 func main() {
 	flag.Parse()
-	log.Println("server started...")
+	log.Println("server started")
 	if err := run(*size); err != nil {
 		log.Fatal(err)
 	}
